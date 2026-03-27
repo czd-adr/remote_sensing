@@ -18,7 +18,10 @@
       <i class="el-icon-user-solid"></i>
       <span slot="title">机器学习结果</span>
     </el-menu-item>
-
+    <el-menu-item index="/index/compartion">
+      <i class="el-icon-user-solid"></i>
+      <span slot="title">差异对比</span>
+    </el-menu-item>
     <el-menu-item index="/index/sample">
       <i class="el-icon-s-goods"></i>
       <span slot="title">样本信息</span>
