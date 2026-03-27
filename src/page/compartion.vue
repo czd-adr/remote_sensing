@@ -55,7 +55,7 @@ const config = reactive({
   date1: '2026-02',
   date2: '2026-06'
 })
-
+const test = ''
 let mapLeft, mapRight
 
 const initMaps = () => {
