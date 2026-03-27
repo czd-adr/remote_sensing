@@ -15,26 +15,43 @@
       <div class="map-label">TIME PERIOD 2</div>
     </div>
 
-    <div class="filter-panel">
-      <div class="panel-title">PRIMARY SOURCE</div>
-      <div class="filter-item">
-        <label>BAND SELECTION</label>
-        <el-select v-model="config.bands" size="small">
-          <el-option label="NDVI (Vegetation)" value="ndvi" />
-          <el-option label="RGB (Natural Color)" value="rgb" />
-        </el-select>
+    <div class="filter-panel" :class="{ 'is-collapsed': isCollapsed }">
+      <div class="panel-header">
+        <span class="panel-title">PRIMARY SOURCE</span>
+        <div class="collapse-btn" @click="isCollapsed = !isCollapsed">
+          <el-icon>
+            <ArrowUp v-if="!isCollapsed" />
+            <ArrowDown v-else />
+          </el-icon>
+        </div>
       </div>
-      <div class="filter-item">
-        <label>TIME PERIOD 1 (LEFT)</label>
-        <el-date-picker v-model="config.date1" type="month" size="small" />
-      </div>
-      <div class="filter-item">
-        <label>TIME PERIOD 2 (RIGHT)</label>
-        <el-date-picker v-model="config.date2" type="month" size="small" />
-      </div>
-      <el-button type="primary" class="generate-btn" @click="updateComparison">
-        GENERATE DELTA REPORT
-      </el-button>
+
+      <transition name="el-zoom-in-top">
+        <div v-show="!isCollapsed" class="panel-content">
+          <div class="filter-item">
+            <label>BAND SELECTION</label>
+            <el-select v-model="config.bands" size="small">
+              <el-option label="NDVI (Vegetation)" value="ndvi" />
+              <el-option label="RGB (Natural Color)" value="rgb" />
+            </el-select>
+          </div>
+          <div class="filter-item">
+            <label>TIME PERIOD 1 (LEFT)</label>
+            <el-date-picker v-model="config.date1" type="month" size="small" />
+          </div>
+          <div class="filter-item">
+            <label>TIME PERIOD 2 (RIGHT)</label>
+            <el-date-picker v-model="config.date2" type="month" size="small" />
+          </div>
+          <el-button
+            type="primary"
+            class="generate-btn"
+            @click="updateComparison"
+          >
+            GENERATE DELTA REPORT
+          </el-button>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -61,8 +78,8 @@ let mapLeft, mapRight
 const initMaps = () => {
   // 1. 创建一个共享的 View 实例，这是联动的核心
   const sharedView = new View({
-    center: [119.1925068226449,
-      34.78110354166833],
+    center: [119.15779750285226,
+      34.763764665834195],
     zoom: 12.606060592924596,
     projection: 'EPSG:4326'
   })
