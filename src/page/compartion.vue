@@ -65,12 +65,11 @@ import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import TileWMS from 'ol/source/TileWMS'
 import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
-  bands: 'ndvi',
-  date1: '2026-02',
-  date2: '2026-06'
+
 })
 const test = ''
 let mapLeft, mapRight
@@ -125,6 +124,19 @@ const initMaps = () => {
 }
 
 const updateComparison = () => {
+  console.log(config.date1);
+  console.log(config.date2);
+
+  // 非空检查
+  if (!config.date1) {
+    ElMessage.error('Please select TIME PERIOD 1 (LEFT)')
+    return
+  }
+  if (!config.date2) {
+    ElMessage.error('Please select TIME PERIOD 2 (RIGHT)')
+    return
+  }
+
   console.log('执行对比请求', config)
 }
 
