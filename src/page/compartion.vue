@@ -37,11 +37,21 @@
           </div>
           <div class="filter-item">
             <label>TIME PERIOD 1 (LEFT)</label>
-            <el-date-picker v-model="config.date1" type="month" size="small" />
+            <el-date-picker
+              v-model="config.date1"
+              type="month"
+              size="small"
+              value-format="YYYY-MM"
+            />
           </div>
           <div class="filter-item">
             <label>TIME PERIOD 2 (RIGHT)</label>
-            <el-date-picker v-model="config.date2" type="month" size="small" />
+            <el-date-picker
+              v-model="config.date2"
+              type="month"
+              size="small"
+              value-format="YYYY-MM"
+            />
           </div>
           <el-button
             type="primary"
@@ -58,7 +68,7 @@
 
 <script setup>
 import { ref, onMounted, reactive, nextTick } from 'vue'
-
+import axios from 'axios'
 import 'ol/ol.css'
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -66,14 +76,28 @@ import TileLayer from 'ol/layer/Tile'
 import TileWMS from 'ol/source/TileWMS'
 import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { diffNDVI } from '../api/diff'
 
 const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
 
 })
-const test = ''
 let mapLeft, mapRight
-
+const createTestLayer = (layerName) => {
+  return new TileLayer({
+    zIndex: 1000,
+    source: new TileWMS({
+      url: 'http://localhost:8080/geoserver/test/wms', // 建议统一用 wms 结尾
+      params: {
+        'LAYERS': `test:${layerName}`,
+        'TILED': true,
+        'FORMAT': 'image/png' // 确保支持透明
+      },
+      serverType: 'geoserver',
+      crossOrigin: 'anonymous' // 避免跨域画布污染
+    })
+  });
+};
 const initMaps = () => {
   // 1. 创建一个共享的 View 实例，这是联动的核心
   const sharedView = new View({
@@ -102,11 +126,11 @@ const initMaps = () => {
           params: { 'LAYERS': 'test:628yangshi', 'TILED': true },
           serverType: 'geoserver'
         })
-      })
+      }), // 你的底图
+      // createTestLayer('23_1_NDVI') // 直接传入你想测试的文件名
     ],
-    view: sharedView // 使用共享视图
-  })
-
+    view: sharedView
+  });
   // 3. 初始化右侧地图
   mapRight = new Map({
     target: 'map-right',
@@ -122,12 +146,27 @@ const initMaps = () => {
     view: sharedView // 使用同一个共享视图
   })
 }
+const NDVI_23_1 = new TileLayer({
+  source: new TileWMS({
+    url: 'http://localhost:8080/geoserver/test/23_1_NDVI',
+    params: {
+      'LAYERS': 'test:23_1_NDVI',
+      'TILED': true
+    },
+    serverType: 'geoserver',
 
-const updateComparison = () => {
+  })
+});
+const updateComparison = async () => {
   console.log(config.date1);
   console.log(config.date2);
+  console.log(config.bands);
 
   // 非空检查
+  if (!config.bands) {
+    ElMessage.error('Please select BAND SELECTION')
+    return
+  }
   if (!config.date1) {
     ElMessage.error('Please select TIME PERIOD 1 (LEFT)')
     return
@@ -137,7 +176,19 @@ const updateComparison = () => {
     return
   }
 
-  console.log('执行对比请求', config)
+  try {
+    // 1. 确保传入的是格式化后的字符串 "2026-02"
+    console.log('正在发起差异请求...', config.date1, config.date2);
+
+    const res = await diffNDVI(config.date1, config.date2);
+
+    if (res.status === 200) {
+      console.log('后端已接收并打印:', config.date1, config.date2);
+      // 这里处理后续逻辑，比如刷新图层或显示图表
+    }
+  } catch (error) {
+    console.error('请求失败:', error);
+  }
 }
 
 onMounted(() => {
