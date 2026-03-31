@@ -83,6 +83,8 @@ const config = reactive({
 
 })
 const mousePosition = ref('')
+let currentLeftLayer = null;
+let currentRightLayer = null;
 let mapLeft, mapRight
 const createTestLayer = (layerName) => {
   return new TileLayer({
@@ -102,8 +104,8 @@ const createTestLayer = (layerName) => {
 const initMaps = () => {
   // 1. 创建一个共享的 View 实例，这是联动的核心
   const sharedView = new View({
-    center: [119.15779750285226,
-      34.763764665834195],
+    center: [119.20167290618058,
+      34.78598950513149],
     zoom: 12.606060592924596,
     projection: 'EPSG:4326'
   })
@@ -128,11 +130,10 @@ const initMaps = () => {
           serverType: 'geoserver'
         })
       }), // 你的底图
-      createTestLayer('23_1_NDVI') // 直接传入你想测试的文件名
     ],
     view: sharedView
   });
-  
+
 
   // 3. 初始化右侧地图
   mapRight = new Map({
@@ -174,40 +175,55 @@ const NDVI_23_1 = new TileLayer({
 
   })
 });
+const NDVI_23_2 = new TileLayer({
+  source: new TileWMS({
+    url: 'http://localhost:8080/geoserver/test/23_2_NDVI',
+    params: {
+      'LAYERS': 'test:23_2_NDVI',
+      'TILED': true
+    },
+    serverType: 'geoserver',
 
+  })
+})
 const updateComparison = async () => {
-  console.log(config.date1);
-  console.log(config.date2);
-  console.log(config.bands);
-
-  // 非空检查
-  if (!config.bands) {
-    ElMessage.error('Please select BAND SELECTION')
-    return
-  }
-  if (!config.date1) {
-    ElMessage.error('Please select TIME PERIOD 1 (LEFT)')
-    return
-  }
-  if (!config.date2) {
-    ElMessage.error('Please select TIME PERIOD 2 (RIGHT)')
-    return
+  // --- 非空检查 (保持你原有的逻辑) ---
+  if (!config.bands || !config.date1 || !config.date2) {
+    ElMessage.error('Please complete selection');
+    return;
   }
 
+  // 2. 转换日期格式为 GeoServer 图层名规则 (例如: 2023-01 -> 23_1_NDVI)
+  const getLayerNameByDate = (dateStr) => {
+    const [year, month] = dateStr.split('-');
+    const yearShort = year.substring(2); // "2023" -> "23"
+    const monthInt = parseInt(month);    // "01" -> "1"
+    return `${yearShort}_${monthInt}_NDVI`;
+  };
+
+  const layerNameLeft = getLayerNameByDate(config.date1);
+  const layerNameRight = getLayerNameByDate(config.date2);
+
+  // 3. 更新左侧地图图层
+  if (currentLeftLayer) mapLeft.removeLayer(currentLeftLayer); // 移除旧的
+  currentLeftLayer = createTestLayer(layerNameLeft);          // 创建新的
+  mapLeft.addLayer(currentLeftLayer);
+
+  // 4. 更新右侧地图图层
+  if (currentRightLayer) mapRight.removeLayer(currentRightLayer);
+  currentRightLayer = createTestLayer(layerNameRight);
+  mapRight.addLayer(currentRightLayer);
+
+  // 5. 调用后端接口进行数据分析 (保持你原有的 axios 逻辑)
   try {
-    // 1. 确保传入的是格式化后的字符串 "2026-02"
-    console.log('正在发起差异请求...', config.date1, config.date2);
-
     const res = await diffNDVI(config.date1, config.date2);
-
     if (res.status === 200) {
-      console.log('后端已接收并打印:', config.date1, config.date2);
-      // 这里处理后续逻辑，比如刷新图层或显示图表
+      ElMessage.success('Analysis report generated');
     }
   } catch (error) {
-    console.error('请求失败:', error);
+    console.error('API Error:', error);
   }
-}
+};
 
 onMounted(() => {
   nextTick(() => {
