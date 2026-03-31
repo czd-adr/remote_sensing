@@ -4,7 +4,7 @@
       <div id="map-left" class="map-instance"></div>
       <div class="map-label">TIME PERIOD 1</div>
     </div>
-
+    <div class="coordinate">{{ mousePosition }}</div>
     <div class="static-divider">
       <div class="divider-line"></div>
       <div class="center-logo"></div>
@@ -82,6 +82,7 @@ const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
 
 })
+const mousePosition = ref('')
 let mapLeft, mapRight
 const createTestLayer = (layerName) => {
   return new TileLayer({
@@ -131,6 +132,13 @@ const initMaps = () => {
     ],
     view: sharedView
   });
+  mapLeft.on('pointermove', (event) => {
+    const [lon, lat] = event.coordinate
+
+    mousePosition.value = `${lon.toFixed(6)},${lat.toFixed(6)}`
+
+
+  })
   // 3. 初始化右侧地图
   mapRight = new Map({
     target: 'map-right',
@@ -300,5 +308,15 @@ onMounted(() => {
   width: 100%;
   background: #235fa7;
   border: none;
+}
+.coordinate {
+  height: 20px;
+  width: 180px;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 1px;
+  border-radius: 5px;
 }
 </style>
