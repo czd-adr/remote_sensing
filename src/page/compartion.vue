@@ -17,7 +17,7 @@
 
     <div class="filter-panel" :class="{ 'is-collapsed': isCollapsed }">
       <div class="panel-header">
-        <span class="panel-title">PRIMARY SOURCE</span>
+        <span class="panel-title">主要数据源</span>
         <div class="collapse-btn" @click="isCollapsed = !isCollapsed">
           <el-icon>
             <ArrowUp v-if="!isCollapsed" />
@@ -29,14 +29,14 @@
       <transition name="el-zoom-in-top">
         <div v-show="!isCollapsed" class="panel-content">
           <div class="filter-item">
-            <label>BAND SELECTION</label>
+            <label>波段选择</label>
             <el-select v-model="config.bands" size="small">
               <el-option label="NDVI (Vegetation)" value="ndvi" />
               <el-option label="RGB (Natural Color)" value="rgb" />
             </el-select>
           </div>
           <div class="filter-item">
-            <label>TIME PERIOD 1 (LEFT)</label>
+            <label>时相 1(左)</label>
             <el-date-picker
               v-model="config.date1"
               type="month"
@@ -45,7 +45,7 @@
             />
           </div>
           <div class="filter-item">
-            <label>TIME PERIOD 2 (RIGHT)</label>
+            <label>时相 2(右)</label>
             <el-date-picker
               v-model="config.date2"
               type="month"
@@ -53,13 +53,18 @@
               value-format="YYYY-MM"
             />
           </div>
-          <el-button
-            type="primary"
-            class="generate-btn"
-            @click="updateComparison"
-          >
-            GENERATE DELTA REPORT
-          </el-button>
+          <div class="button-group">
+            <el-button
+              type="primary"
+              class="generate-btn"
+              @click="updateComparison"
+            >
+              对比生成
+            </el-button>
+            <el-button type="primary" class="reset-btn" @click="resetForm">
+              重置
+            </el-button>
+          </div>
         </div>
       </transition>
     </div>
@@ -225,6 +230,18 @@ const updateComparison = async () => {
   }
 };
 
+const resetForm = () => {
+  config.bands = ''
+  config.date1 = ''
+  config.date2 = ''
+  if (currentLeftLayer) {
+    mapLeft.removeLayer(currentLeftLayer);
+  }
+  if (currentRightLayer) {
+    mapRight.removeLayer(currentRightLayer);
+  }
+};
+
 onMounted(() => {
   nextTick(() => {
     initMaps()
@@ -331,10 +348,25 @@ onMounted(() => {
 }
 
 .generate-btn {
-  width: 100%;
+  flex: 2;
   background: #235fa7;
   border: none;
 }
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.reset-btn {
+  flex: 1;
+  background: #235fa7;
+  border: none;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
 .coordinate {
   height: 20px;
   width: 180px;
