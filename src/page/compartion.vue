@@ -128,17 +128,12 @@ const initMaps = () => {
           serverType: 'geoserver'
         })
       }), // 你的底图
-      // createTestLayer('23_1_NDVI') // 直接传入你想测试的文件名
+      createTestLayer('23_1_NDVI') // 直接传入你想测试的文件名
     ],
     view: sharedView
   });
-  mapLeft.on('pointermove', (event) => {
-    const [lon, lat] = event.coordinate
+  
 
-    mousePosition.value = `${lon.toFixed(6)},${lat.toFixed(6)}`
-
-
-  })
   // 3. 初始化右侧地图
   mapRight = new Map({
     target: 'map-right',
@@ -153,6 +148,20 @@ const initMaps = () => {
     ],
     view: sharedView // 使用同一个共享视图
   })
+  mapLeft.on('pointermove', (event) => {
+    const [lon, lat] = event.coordinate
+
+    mousePosition.value = `${lon.toFixed(6)},${lat.toFixed(6)}`
+
+
+  })
+  mapRight.on('pointermove', (event) => {
+    const [lon, lat] = event.coordinate
+
+    mousePosition.value = `${lon.toFixed(6)},${lat.toFixed(6)}`
+
+
+  })
 }
 const NDVI_23_1 = new TileLayer({
   source: new TileWMS({
@@ -165,6 +174,7 @@ const NDVI_23_1 = new TileLayer({
 
   })
 });
+
 const updateComparison = async () => {
   console.log(config.date1);
   console.log(config.date2);
