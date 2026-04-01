@@ -19,6 +19,7 @@
         :stops="ndviStops"
         v-show="isActiveNDVI"
       />
+      <AnalysisReport :data="analysisData" @close="analysisData = null" />
       <div class="map-label">TIME PERIOD 2</div>
     </div>
 
@@ -79,7 +80,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, nextTick } from 'vue'
+import { ref, onMounted, reactive, nextTick, computed } from 'vue'
+import { DataAnalysis, Right, CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import axios from 'axios'
 import 'ol/ol.css'
 import Map from 'ol/Map'
@@ -90,12 +92,14 @@ import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { diffNDVI } from '../api/diff'
 import GradientLegend from '../components/GradientLegend.vue'
+import AnalysisReport from '../components/AnalysisReport.vue'
 const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
 
 })
 const mousePosition = ref('')
 const isActiveNDVI = ref(false)
+const analysisData = ref(null)
 let currentLeftLayer = null;
 let currentRightLayer = null;
 let mapLeft, mapRight
@@ -237,8 +241,10 @@ const updateComparison = async () => {
   // 5. 调用后端接口进行数据分析 (保持你原有的 axios 逻辑)
   try {
     const res = await diffNDVI(config.date1, config.date2);
-    if (res.status === 200) {
+    if (res.data && res.data.status === 'success') {
       ElMessage.success('Analysis report generated');
+      analysisData.value = res.data
+      ElMessage.success('分析报告已更新')
     }
   } catch (error) {
     console.error('API Error:', error);
@@ -256,6 +262,7 @@ const resetForm = () => {
     mapRight.removeLayer(currentRightLayer);
   }
   isActiveNDVI.value = false
+  analysisData.value = null
 };
 
 onMounted(() => {
