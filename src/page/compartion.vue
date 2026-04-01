@@ -255,6 +255,7 @@ const resetForm = () => {
   if (currentRightLayer) {
     mapRight.removeLayer(currentRightLayer);
   }
+  isActiveNDVI.value = false
 };
 
 onMounted(() => {
