@@ -2,6 +2,7 @@
   <div class="analysis-container">
     <div class="map-wrapper left-map">
       <div id="map-left" class="map-instance"></div>
+
       <div class="map-label">TIME PERIOD 1</div>
     </div>
     <div class="coordinate">{{ mousePosition }}</div>
@@ -12,6 +13,12 @@
 
     <div class="map-wrapper right-map">
       <div id="map-right" class="map-instance"></div>
+      <GradientLegend
+        class="map-legend"
+        title="NDVI INDEX"
+        :stops="ndviStops"
+        v-show="isActiveNDVI"
+      />
       <div class="map-label">TIME PERIOD 2</div>
     </div>
 
@@ -82,15 +89,23 @@ import TileWMS from 'ol/source/TileWMS'
 import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { diffNDVI } from '../api/diff'
-
+import GradientLegend from '../components/GradientLegend.vue'
 const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
 
 })
 const mousePosition = ref('')
+const isActiveNDVI = ref(false)
 let currentLeftLayer = null;
 let currentRightLayer = null;
 let mapLeft, mapRight
+const ndviStops = [
+  { color: "#FFFFFF", quantity: 0.00, label: "0" },
+  { color: "#FCD163", quantity: 0.20, label: "0.2" },
+  { color: "#66A000", quantity: 0.40, label: "0.4" },
+  { color: "#207401", quantity: 0.60, label: "0.6" },
+  { color: "#011301", quantity: 0.80, label: "0.8" }
+]
 const createTestLayer = (layerName) => {
   return new TileLayer({
     zIndex: 1000,
@@ -218,7 +233,7 @@ const updateComparison = async () => {
   if (currentRightLayer) mapRight.removeLayer(currentRightLayer);
   currentRightLayer = createTestLayer(layerNameRight);
   mapRight.addLayer(currentRightLayer);
-
+  isActiveNDVI.value = true
   // 5. 调用后端接口进行数据分析 (保持你原有的 axios 逻辑)
   try {
     const res = await diffNDVI(config.date1, config.date2);
@@ -376,5 +391,17 @@ onMounted(() => {
   background-color: rgba(255, 255, 255, 0.8);
   padding: 1px;
   border-radius: 5px;
+}
+.map-legend {
+  position: absolute;
+  top: 20px; /* 距离顶部 20px，与左侧 filter-panel 对齐 */
+  right: 20px; /* 距离右侧 20px */
+  z-index: 1000; /* 确保层级高于地图和标签 */
+
+  /* 可选：增加一点磨砂玻璃效果，更符合你目前的暗色调 UI */
+  background: rgba(21, 23, 27, 0.9) !important;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(86, 182, 194, 0.3); /* 使用你定义的蓝色调边框 */
 }
 </style>
