@@ -31,11 +31,6 @@
       <i class="el-icon-s-goods"></i>
       <span slot="title">植被监测信息</span>
     </el-menu-item>
-
-    <el-menu-item index="/index/mlTest">
-      <i class="el-icon-s-goods"></i>
-      <span slot="title">变化监测信息</span>
-    </el-menu-item>
   </el-menu>
 </template>
 
