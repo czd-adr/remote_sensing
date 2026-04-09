@@ -1,79 +1,80 @@
 <template>
-  <div class="auth-container">
-    <div class="auth-card">
-      <h2>{{ isLogin ? '用户登录' : '用户注册' }}</h2>
+  <div class="login-container">
+    <el-card class="login-box">
+      <template #header>
+        <h3>系统登录</h3>
+      </template>
 
-      <el-form :model="form" class="auth-form">
+      <el-form :model="loginForm" label-width="80px">
         <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" />
         </el-form-item>
 
         <el-form-item label="密码">
-          <el-input v-model="form.password" placeholder="请输入密码" show-password />
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="请输入密码"
+            show-password
+          />
         </el-form-item>
 
-        <el-button
-          type="primary"
-          class="auth-btn"
-          @click="handleSubmit"
-          :loading="loading"
-        >
-          {{ isLogin ? '登录' : '注册' }}
-        </el-button>
-
-        <div class="switch-mode" @click="isLogin = !isLogin">
-          {{ isLogin ? '没有账号？去注册 →' : '已有账号？去登录 →' }}
-        </div>
+        <el-form-item>
+          <el-button
+            type="primary"
+            @click="handleLogin"
+            :loading="loading"
+            style="width: 100%"
+          >
+            立即登录
+          </el-button>
+        </el-form-item>
       </el-form>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
-// 后端接口基础路径
-const BASE_URL = 'http://localhost:8080'  // 你的 Spring Boot 服务地址
-
-const isLogin = ref(true)
+const router = useRouter()
 const loading = ref(false)
-const form = ref({
+
+const loginForm = reactive({
   username: '',
   password: ''
 })
 
-const handleSubmit = async () => {
-  if (!form.value.username || !form.value.password) {
-    ElMessage.warning('请输入用户名和密码')
+const handleLogin = async () => {
+  if (!loginForm.username || !loginForm.password) {
+    ElMessage.warning('请填写完整信息')
     return
   }
 
   loading.value = true
-
   try {
-    if (isLogin.value) {
-      // 登录请求
-      const res = await axios.post(`${BASE_URL}/auth/login`, form.value)
-      const token = res.data.data?.token
-      if (token) {
-        localStorage.setItem('token', token)
-        ElMessage.success('登录成功')
-        // 跳转首页或其他页面
-        window.location.href = '/home'
-      } else {
-        ElMessage.error('登录失败')
-      }
+    // 注意：这里的 URL 要对应你后端的端口，通常是 8080
+    // 如果配置了 proxy，直接写 /api/user/login
+    const res = await axios.post('http://localhost:8099/user/login', loginForm)
+
+    // 对应你后端 Map 里的 status 字段
+    if (res.data.status === 'success') {
+      ElMessage.success('登录成功！')
+
+      // 保存用户信息和 Token（如果有的话）
+      localStorage.setItem('userInfo', JSON.stringify(res.data.data))
+
+      // 跳转到分析主页
+      router.push('/index')
     } else {
-      // 注册请求
-      await axios.post(`${BASE_URL}/auth/register`, form.value)
-      ElMessage.success('注册成功，请登录')
-      isLogin.value = true
+      ElMessage.error(res.data.msg || '登录失败')
     }
   } catch (error) {
-    console.error(error)
-    ElMessage.error(error.response?.data?.message || '请求失败')
+    console.error('接口请求异常:', error)
+    ElMessage.error('无法连接到服务器，请检查后端是否启动')
   } finally {
     loading.value = false
   }
@@ -81,38 +82,14 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-.auth-container {
+.login-container {
+  height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #a2c2e1, #f6f9fc);
+  background-color: #f5f7fa;
 }
-
-.auth-card {
-  width: 360px;
-  padding: 40px 30px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-}
-
-h2 {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-}
-
-.auth-btn {
-  width: 100%;
-  margin-top: 10px;
-}
-
-.switch-mode {
-  text-align: center;
-  margin-top: 15px;
-  color: #409eff;
-  cursor: pointer;
-  font-size: 14px;
+.login-box {
+  width: 400px;
 }
 </style>
