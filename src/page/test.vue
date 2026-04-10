@@ -20,6 +20,21 @@
     <el-button class="Inspector" @click="toggleInspector">Inspector</el-button>
     <el-button class="Draw" @click="toggleDraw">draw</el-button>
     <el-button class="clearChart" @click="clear">clearDraw</el-button>
+    <el-dropdown trigger="hover" @command="handleCommand" class="user-dropdown">
+      <span class="el-dropdown-link">
+        <el-avatar :size="28" icon="UserFilled" />
+        <el-icon class="el-icon--right"><arrow-down /></el-icon>
+      </span>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <el-dropdown-item command="settings">个人设置</el-dropdown-item>
+          <el-dropdown-item command="project">项目信息</el-dropdown-item>
+          <el-dropdown-item divided command="logout" style="color: #f56c6c">
+            退出登录
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
     <div id="map" v-if="showMap"></div>
     <div class="coordinate">{{ mousePosition }}</div>
     <div class="slider-dem-block">
@@ -142,6 +157,7 @@ import Draw from 'ol/interaction/Draw.js';
 // 控件
 import { defaults as defaultControls } from 'ol/control'
 import { Delete, Edit, Search, Share, Upload } from '@element-plus/icons-vue'
+import { useUserStore } from '../store/user'
 // 可选 GeoTIFF（如果你真的使用了）
 import GeoTIFF from 'geotiff'  // ✅ 仅在你加载本地 .tif 时才需要
 
@@ -152,6 +168,8 @@ import Aside from '../components/Aside.vue';
 
 //跨域
 import axios from 'axios'
+import { useRouter } from 'vue-router';
+const router = useRouter()
 const $httpUrl = ref('http://localhost:8099'); // 假设这是你的基础URL
 let map;
 let selectedValue = ref([]);
@@ -251,6 +269,7 @@ const center = [114.31, 30.52]
 //   layers: [] // 初始时不添加任何图层
 // })
 const mousePosition = ref('')
+const userStore = useUserStore()
 const gaodeLayer = new TileLayer({
   source: source2 // 使用卫星图层
 })
@@ -641,6 +660,8 @@ watch(isInspectorActive, (newVal) => {
     }
   }
 });
+//退出登陆逻辑
+
 const open = (results, coordinate) => {
   ElNotification.success({
     title: '查询点信息',
@@ -844,6 +865,23 @@ function clear () {
     isShowNDVILoading.value = false; // 隐藏 NDVI 图表加载动画
   }
 }
+
+function handleCommand (command) {
+  switch (command) {
+    case 'settings':
+      // 个人设置逻辑
+      break;
+    case 'project':
+      // 项目信息逻辑
+      break;
+    case 'logout':
+      ElMessage.success('退出登录成功');
+      userStore.logout();
+      router.push('/login');
+      break;
+  }
+}
+
 function changeBox () {
   console.log(checkboxGroup4.value);
 
@@ -1294,8 +1332,17 @@ function toUp () {
 }
 .Inspector {
   position: absolute;
-  right: 10px;
+  right: 60px;
   top: 10px;
+  z-index: 1000;
+  width: 60px;
+  height: 20px;
+  opacity: 0.6;
+}
+.user-dropdown {
+  position: absolute;
+  right: -10px;
+  top: 5px;
   z-index: 1000;
   width: 60px;
   height: 20px;
@@ -1319,7 +1366,7 @@ function toUp () {
 }
 .Draw {
   position: absolute;
-  right: 150px;
+  right: 200px;
   top: 10px;
   z-index: 1000;
   width: 60px;
@@ -1328,7 +1375,7 @@ function toUp () {
 }
 .clearChart {
   position: absolute;
-  right: 75px;
+  right: 125px;
   top: 10px;
   z-index: 1000;
   width: 70px;
