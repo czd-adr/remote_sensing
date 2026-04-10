@@ -39,7 +39,8 @@ import { ref, reactive } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-
+import { useUserStore } from '@/store/user'
+const userStore = useUserStore()
 const router = useRouter()
 const loading = ref(false)
 
@@ -56,25 +57,22 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    // 注意：这里的 URL 要对应你后端的端口，通常是 8080
-    // 如果配置了 proxy，直接写 /api/user/login
     const res = await axios.post('http://localhost:8099/user/login', loginForm)
 
-    // 对应你后端 Map 里的 status 字段
     if (res.data.status === 'success') {
       ElMessage.success('登录成功！')
 
-      // 保存用户信息和 Token（如果有的话）
-      localStorage.setItem('userInfo', JSON.stringify(res.data.data))
+      // 【核心修改点】：调用 Store 的方法保存数据，取代原来的手动 localStorage 操作
+      // 此时数据不仅存入了浏览器本地，还存入了 Vue 的响应式内存中
+      userStore.setLoginInfo(res.data.data)
 
-      // 跳转到分析主页
       router.push('/index')
     } else {
       ElMessage.error(res.data.msg || '登录失败')
     }
   } catch (error) {
     console.error('接口请求异常:', error)
-    ElMessage.error('无法连接到服务器，请检查后端是否启动')
+    ElMessage.error('无法连接到服务器')
   } finally {
     loading.value = false
   }
