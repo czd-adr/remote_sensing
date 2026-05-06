@@ -13,6 +13,7 @@ import mlTest from '../page/mlTest.vue'
 import ts from '../page/ts.vue'
 import login from '../page/login.vue'
 import compartion from '../page/compartion.vue'
+import chatAnalysis from '../page/chatAnalysis.vue'
 const routes = [
     { 
       path: '/sample', component: sample 
@@ -57,6 +58,11 @@ const routes = [
           path: 'ml', 
           name: 'ml',
           component: ml
+        },
+        {
+          path: 'chatAnalysis', 
+          name: 'chatAnalysis',
+          component: chatAnalysis
         },
         {
           path: 'mlTest', 

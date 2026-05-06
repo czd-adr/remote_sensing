@@ -13,7 +13,10 @@
       <i class="el-icon-user-solid"></i>
       <span slot="title">首页</span>
     </el-menu-item>
-
+    <el-menu-item index="/index/chatAnalysis">
+      <i class="el-icon-user-solid"></i>
+      <span slot="title">RS-Agent</span>
+    </el-menu-item>
     <el-menu-item index="/index/ml">
       <i class="el-icon-user-solid"></i>
       <span slot="title">机器学习结果</span>

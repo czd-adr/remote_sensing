@@ -140,7 +140,9 @@ import { Feature } from 'ol';
 import TileLayer from 'ol/layer/Tile'
 import ImageLayer from 'ol/layer/Image'
 import VectorLayer from 'ol/layer/Vector'
-
+//状态管理
+import { useUserStore } from '@/store/user'
+import { storeToRefs } from 'pinia'
 // 数据源
 import OSM from 'ol/source/OSM'
 import XYZ from 'ol/source/XYZ'
@@ -157,7 +159,6 @@ import Draw from 'ol/interaction/Draw.js';
 // 控件
 import { defaults as defaultControls } from 'ol/control'
 import { Delete, Edit, Search, Share, Upload } from '@element-plus/icons-vue'
-import { useUserStore } from '../store/user'
 // 可选 GeoTIFF（如果你真的使用了）
 import GeoTIFF from 'geotiff'  // ✅ 仅在你加载本地 .tif 时才需要
 
@@ -190,6 +191,9 @@ let isShowLoading = ref(false) // 控制加载动画的变量
 let isShowNDVI = ref(false) // 控制 NDVI 图表加载动画的变量s
 let months = ref([]) // ["Jul", "Oct", "Feb", ...]
 let monthsValues = ref([])
+// 1. 获取 store 实例
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
 const loading = ref(true)
 const showChart = ref(false) // 控制图表显示的变量
 const drawSource = new VectorSource();
@@ -269,7 +273,6 @@ const center = [114.31, 30.52]
 //   layers: [] // 初始时不添加任何图层
 // })
 const mousePosition = ref('')
-const userStore = useUserStore()
 const gaodeLayer = new TileLayer({
   source: source2 // 使用卫星图层
 })
@@ -529,7 +532,11 @@ const staticImaggeLayer = new ImageLayer({
 const showMap = ref(true) // 控制地图显示的变量
 onMounted(() => {
   // console.log(axios);
-
+  const checkRole = () => {
+    console.log('当前用户ID:', userInfo.value.id)
+    console.log('当前用户角色:', userInfo.value.role)
+  }
+  checkRole()
   initMap()
   loadChart()
   getArea(1)
@@ -786,7 +793,7 @@ function fetchNDVI (year, grass) {
       console.log('NDVI结果:', res.data);
       monthNDVIs.value = res.data;
       months.value = Object.keys(monthNDVIs.value); // ["Jul", "Oct", "Feb", ...]
-      monthsValues.value = Object.values(monthNDVIs.value);
+      monthsValues.value = Object.values(monthNDVIs.value); //将返回值赋值给全局变量
       console.log(monthsValues.value);
 
       isShowNDVI.value = true; // 显示 NDVI 图表加载动画
