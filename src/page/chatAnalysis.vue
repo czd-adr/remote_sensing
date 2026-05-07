@@ -113,7 +113,11 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { fetchChatStream } from "@/api/chat";
-
+//获取用户登陆信息
+import { useUserStore } from '@/store/user'
+import { storeToRefs } from 'pinia'
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
 const userInput = ref("");
 const messages = ref([]);
 const isStreaming = ref(false);
@@ -173,7 +177,9 @@ const handleSend = async (customMsg = null) => {
 };
 
 const createNewAnalysis = () => {
-  const userId = "user_77";
+  console.log('当前用户ID:', userInfo.value.id)
+  console.log('当前用户角色:', userInfo.value.role)
+  const userId = userInfo.value.id
   currentMemoryId.value = `${userId}_${Date.now()}`;
   messages.value = [];
   handleSend("你是谁？");
