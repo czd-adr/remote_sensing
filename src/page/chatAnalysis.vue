@@ -15,24 +15,28 @@
       <div class="history-scroll-area">
         <p class="section-title">Recent Sessions</p>
         <div
-          v-for="session in historySessions"
-          :key="session.id"
-          class="history-item"
+          v-for="session in sessionList"
+          :key="session.memoryId"
+          :class="[
+            'history-item',
+            { active: currentMemoryId === session.memoryId },
+          ]"
+          @click="handleSelectSession(session.memoryId)"
         >
           <div class="history-icon">🕒</div>
           <div class="history-info">
             <p class="history-name">{{ session.title }}</p>
             <p class="history-time">{{ session.time }}</p>
           </div>
+          <button
+            class="delete-btn"
+            @click.stop="confirmDelete(session.memoryId)"
+          >
+            ×
+          </button>
         </div>
+
         <!-- 模拟较多数据以测试滚动 -->
-        <div v-for="i in 10" :key="'mock-' + i" class="history-item">
-          <div class="history-icon">🕒</div>
-          <div class="history-info">
-            <p class="history-name">Old Analysis Archive {{ i }}</p>
-            <p class="history-time">Updated 1 month ago</p>
-          </div>
-        </div>
       </div>
     </aside>
 
@@ -112,7 +116,8 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
-import { fetchChatStream } from "@/api/chat";
+import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession } from "@/api/chat";
+import { ElMessageBox, ElMessage } from 'element-plus';
 //获取用户登陆信息
 import { useUserStore } from '@/store/user'
 import { storeToRefs } from 'pinia'
@@ -123,13 +128,57 @@ const messages = ref([]);
 const isStreaming = ref(false);
 const chatContainer = ref(null);
 const currentMemoryId = ref("");
-
+const sessionList = ref([]);
+const loading = ref(false);
 const historySessions = ref([
   { id: 1, title: 'Amazon Deforestation 2024', time: 'Updated 2h ago' },
   { id: 2, title: 'Sahara Dust Storm Track', time: 'Updated 1d ago' },
   { id: 3, title: 'Urban Expansion Tokyo', time: 'Updated 3d ago' }
 ]);
+const confirmDelete = async (memoryId) => {
+  // 1. 使用 ElMessageBox 进行二次确认
+  try {
+    await ElMessageBox.confirm(
+      '此操作将永久删除该聊天会话及其历史记录, 是否继续?',
+      '提示',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        // 也可以开启按钮的危险样式
+        confirmButtonClass: 'el-button--danger',
+      }
+    );
 
+    // 2. 如果用户点击确定，执行删除逻辑
+    try {
+      await deleteChatSession(memoryId);
+
+      // 3. 结果反馈：删除成功
+      ElMessage({
+        type: 'success',
+        message: '会话已成功删除',
+      });
+
+      // 4. 刷新列表
+      await loadSessions();
+
+      // 5. 如果删掉的是当前正在看的会话，清空界面
+      if (currentMemoryId.value === memoryId) {
+        messages.value = [];
+        currentMemoryId.value = "";
+        // loadSessions 内部逻辑会自动选中剩余的第一个（如果你之前的代码里写了的话）
+      }
+    } catch (error) {
+      console.error("后端删除接口报错:", error);
+      ElMessage.error("删除失败，服务器响应异常");
+    }
+
+  } catch (cancel) {
+    // 用户点击取消或关闭弹窗
+    console.log('用户取消了删除');
+  }
+};
 const scrollToBottom = async () => {
   await nextTick();
   if (chatContainer.value) {
@@ -139,17 +188,49 @@ const scrollToBottom = async () => {
     });
   }
 };
+const loadSessions = async () => {
+  loading.value = true;
+  try {
+    const res = await fetchChatSessions();
+    sessionList.value = res.data;
 
+    // --- 核心逻辑：默认选中第一个 ---
+    if (sessionList.value.length > 0) {
+      const firstSessionId = sessionList.value[0].memoryId;
+      // 只有在没有选中任何会话的情况下，才自动加载第一个
+      if (!currentMemoryId.value) {
+        handleSelectSession(firstSessionId);
+      }
+    } else {
+      // 如果没有任何历史会话，则开启一个全新的分析
+      createNewAnalysis();
+    }
+    // ----------------------------
+
+  } catch (error) {
+    console.error("加载会话列表失败:", error);
+  } finally {
+    loading.value = false;
+  }
+};
 const handleSend = async (customMsg = null) => {
   const text = customMsg || userInput.value;
+  // 防止重复发送或空发送
   if (!text || (isStreaming.value && !customMsg)) return;
 
+  // 1. 如果是用户手动输入，添加用户消息到列表
   if (!customMsg) {
     messages.value.push({ role: 'user', content: text });
     userInput.value = "";
   }
 
-  const aiMessageIndex = messages.value.push({ role: 'assistant', content: "", loading: true }) - 1;
+  // 2. 预先添加一个空的 AI 消息对象，用于承接流式输出
+  const aiMessageIndex = messages.value.push({
+    role: 'assistant',
+    content: "",
+    loading: true
+  }) - 1;
+
   isStreaming.value = true;
   await scrollToBottom();
 
@@ -158,34 +239,68 @@ const handleSend = async (customMsg = null) => {
       currentMemoryId.value,
       text,
       (token) => {
+        // 3. 实时拼接 token
         messages.value[aiMessageIndex].content += token;
+        // 建议：此处可以根据需要决定是否每一帧都滚动，或者加个节流
         scrollToBottom();
       },
-      () => {
+      async () => {
+        // 4. 流式传输完成后的回调
         messages.value[aiMessageIndex].loading = false;
         isStreaming.value = false;
+
+        // 重要：对话结束后刷新左侧列表，确保新会话标题能显示出来
+        // 因为只有发送了消息，后端 Redis 才会执行 updateMessages 存储摘要
+        await loadSessions();
       },
       (err) => {
+        // 5. 错误处理
         messages.value[aiMessageIndex].content = "服务连接异常，请重试。";
         messages.value[aiMessageIndex].loading = false;
         isStreaming.value = false;
+        console.error("Stream Error:", err);
       }
     );
   } catch (e) {
     isStreaming.value = false;
+    console.error("Send Error:", e);
   }
 };
 
 const createNewAnalysis = () => {
-  console.log('当前用户ID:', userInfo.value.id)
-  console.log('当前用户角色:', userInfo.value.role)
-  const userId = userInfo.value.id
+  const userId = userInfo.value.id;
   currentMemoryId.value = `${userId}_${Date.now()}`;
   messages.value = [];
-  handleSend("你是谁？");
+  // 只有真正发送第一条消息后，后端 updateMessages 才会把这个 ID 存入列表
 };
+// 1. 处理点击切换会话
+const handleSelectSession = async (memoryId) => {
+  if (isStreaming.value) return;
 
+  loading.value = true;
+  currentMemoryId.value = memoryId;
+
+  try {
+    const res = await fetchChatHistory(memoryId);
+
+    // 后端 MessageDTO 已经处理好了 role 和 content，直接映射
+    // 如果后端 role 返回的是 'ai'，而前端样式需要 'assistant'，做个简单的转换
+    messages.value = res.data.map(msg => ({
+      role: msg.role === 'ai' ? 'assistant' : msg.role,
+      content: msg.content,
+      loading: false
+    }));
+
+    await scrollToBottom();
+  } catch (error) {
+    console.error("加载历史记录失败:", error);
+    messages.value = []; // 失败时清空防止显示错乱
+  } finally {
+    loading.value = false;
+  }
+};
 onMounted(() => {
+  loadSessions()
   createNewAnalysis();
 });
 </script>
@@ -247,20 +362,47 @@ onMounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* --- 历史项基础样式 --- */
 .history-item {
+  position: relative; /* 为删除按钮定位 */
   display: flex;
   padding: 0.8rem;
   border-radius: 12px;
   cursor: pointer;
-  transition: 0.2s;
-  margin-bottom: 0.2rem;
+  transition: all 0.2s ease;
+  margin: 0 0.5rem 0.2rem;
+  border-left: 4px solid transparent;
 }
+
 .history-item:hover {
   background: #f3f4f6;
 }
+
+/* --- 高亮状态样式 --- */
+.history-item.active {
+  background: #fff7ed; /* 浅橙色背景 */
+  border-left: 4px solid #ea580c; /* 左侧主题色高亮条 */
+}
+
+.history-item.active .history-icon {
+  color: #ea580c;
+}
+
+.history-item.active .history-name {
+  color: #ea580c;
+  font-weight: 600;
+}
+
 .history-icon {
   margin-right: 0.75rem;
   color: #9ca3af;
+  flex-shrink: 0;
+}
+.history-info {
+  flex: 1;
+  overflow: hidden; /* 防止文字溢出撑开容器 */
+  padding-right: 20px; /* 为删除按钮留出空间 */
 }
 .history-name {
   font-size: 0.85rem;
@@ -275,6 +417,36 @@ onMounted(() => {
   color: #9ca3af;
 }
 
+/* --- 删除按钮样式 --- */
+.delete-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s;
+  padding: 4px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.history-item:hover .delete-btn {
+  opacity: 1; /* 悬停显示 */
+}
+
+.delete-btn:hover {
+  color: #ef4444; /* 悬停变红 */
+  background: rgba(239, 68, 68, 0.1); /* 轻微背景提示 */
+}
+
 /* 3. 主界面布局：顶部+中间(滚动)+底部(固定) */
 .main-content {
   flex: 1;
@@ -284,7 +456,7 @@ onMounted(() => {
 }
 
 .top-header {
-  flex-shrink: 0; /* 固定高度 */
+  flex-shrink: 0;
   height: 64px;
   display: flex;
   justify-content: flex-end;
@@ -304,8 +476,8 @@ onMounted(() => {
 
 /* 聊天视口：中间可滚动区域 */
 .chat-viewport {
-  flex: 1; /* 自动撑开占据剩余空间 */
-  overflow-y: auto; /* 允许滚动 */
+  flex: 1;
+  overflow-y: auto;
   padding: 2rem;
   background-color: transparent;
   scroll-behavior: smooth;
@@ -374,7 +546,7 @@ onMounted(() => {
 
 /* 底部固定区 */
 .input-footer {
-  flex-shrink: 0; /* 固定在底部，不参与滚动 */
+  flex-shrink: 0;
   padding: 1.5rem 2rem;
   background: white;
   border-top: 1px solid #f3f4f6;
@@ -405,6 +577,11 @@ onMounted(() => {
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
+  transition: all 0.2s;
+}
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .footer-info {
   display: flex;

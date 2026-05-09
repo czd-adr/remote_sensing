@@ -22,7 +22,15 @@ export function chatBase(memoryId: string, message: string) {
     responseType: 'stream'
   });
 }
-
+export function fetchChatSessions() {
+  return axios({
+    url: `${baseUrl}/WebGISAgent/sessions`, // ⚠️ 注意：这里确保路径与你后端 Controller 的 RequestMapping 一致
+    method: 'get',
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
+}
 /**
  * 推荐：流式对话接口封装
  * 用于实现打字机效果
@@ -67,4 +75,20 @@ export async function fetchChatStream(
     if (onError) onError(error);
     else console.error("Streaming error:", error);
   }
+}
+/**
+ * 获取指定会话的历史记录
+ */
+export function fetchChatHistory(memoryId: string) {
+  return axios({
+    url: `${baseUrl}/WebGISAgent/history`, // 路径需与后端一致
+    method: 'get',
+    params: { memoryId }
+  });
+}
+export function deleteChatSession(memoryId: string) {
+  return axios({
+    url: `${baseUrl}/WebGISAgent/session/${memoryId}`,
+    method: 'delete'
+  });
 }
