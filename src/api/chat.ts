@@ -92,3 +92,14 @@ export function deleteChatSession(memoryId: string) {
     method: 'delete'
   });
 }
+
+export function fetchChatChart(memoryId: string, message: string) {
+  return axios({
+    url: `${baseUrl}/WebGISAgent/chatChart`,
+    method: 'get',
+    params: { memoryId, message },
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
+}

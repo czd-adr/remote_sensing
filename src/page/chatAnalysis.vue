@@ -69,7 +69,9 @@
             >
               {{ msg.role === "user" ? "👤" : "🤖" }}
             </div>
+
             <div
+              v-if="msg.type !== 'chart'"
               :class="[
                 'bubble',
                 msg.role === 'user' ? 'user-bubble' : 'bot-bubble',
@@ -79,9 +81,23 @@
                 {{ msg.role === "user" ? "You" : "RS-Agent" }}
               </div>
               <div class="text-content">
-                {{ msg.content }}
+                {{
+                  msg.content &&
+                  typeof msg.content === "string" &&
+                  msg.content.startsWith("{")
+                    ? "NDVI图表分析中..."
+                    : msg.content
+                }}
                 <span v-if="msg.loading" class="cursor-blink"></span>
               </div>
+            </div>
+
+            <div
+              v-if="msg.type === 'chart'"
+              class="chart-message-wrapper"
+              style="margin-left: 56px"
+            >
+              <NDVIChart :chartData="msg.chartData" />
             </div>
           </div>
         </div>
@@ -116,8 +132,10 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
-import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession } from "@/api/chat";
+import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession, fetchChatChart } from "@/api/chat";
 import { ElMessageBox, ElMessage } from 'element-plus';
+//自定义组件
+import NDVIChart from '@/components/NDVIChart.vue'
 //获取用户登陆信息
 import { useUserStore } from '@/store/user'
 import { storeToRefs } from 'pinia'
@@ -215,18 +233,30 @@ const loadSessions = async () => {
 };
 const handleSend = async (customMsg = null) => {
   const text = customMsg || userInput.value;
-  // 防止重复发送或空发送
   if (!text || (isStreaming.value && !customMsg)) return;
 
-  // 1. 如果是用户手动输入，添加用户消息到列表
   if (!customMsg) {
     messages.value.push({ role: 'user', content: text });
     userInput.value = "";
   }
 
-  // 2. 预先添加一个空的 AI 消息对象，用于承接流式输出
-  const aiMessageIndex = messages.value.push({
+  // 1. 意图预判
+  const isChartRequest = /图表|趋势图|曲线|可视化|分析图|画图/.test(text);
+
+  if (isChartRequest) {
+    // 逻辑 A: 复合链路
+    await handleChartWorkflow(text);
+  } else {
+    // 逻辑 B: 纯文字链路
+    await handleNormalChatWorkflow(text);
+  }
+};
+
+// 复合链路逻辑修正
+const handleChartWorkflow = async (text) => {
+  const aiTextIndex = messages.value.push({
     role: 'assistant',
+    type: 'text',
     content: "",
     loading: true
   }) - 1;
@@ -234,37 +264,77 @@ const handleSend = async (customMsg = null) => {
   isStreaming.value = true;
   await scrollToBottom();
 
+  console.log("🚀 [节点1] 发起并行请求:", { text, memoryId: currentMemoryId.value });
+  const chartPromise = fetchChatChart(currentMemoryId.value, text);
+
   try {
     await fetchChatStream(
       currentMemoryId.value,
       text,
       (token) => {
-        // 3. 实时拼接 token
-        messages.value[aiMessageIndex].content += token;
-        // 建议：此处可以根据需要决定是否每一帧都滚动，或者加个节流
+        messages.value[aiTextIndex].content += token;
         scrollToBottom();
       },
       async () => {
-        // 4. 流式传输完成后的回调
-        messages.value[aiMessageIndex].loading = false;
-        isStreaming.value = false;
+        console.log("✅ [节点2] 文字流结束，准备处理图表数据...");
+        messages.value[aiTextIndex].loading = false;
 
-        // 重要：对话结束后刷新左侧列表，确保新会话标题能显示出来
-        // 因为只有发送了消息，后端 Redis 才会执行 updateMessages 存储摘要
+        try {
+          const res = await chartPromise;
+          console.log("📦 [节点3] 图表接口原始响应:", res);
+
+          // 关键排查点：res.data 是不是预期的 DTO 对象？
+          const rawData = res.data;
+          console.log("🔍 [节点4] data 内容类型:", typeof rawData, rawData);
+
+          let chartData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+          console.log("📊 [节点5] 解析后的 chartData:", chartData);
+
+          // 插入图表消息
+          const chartMsg = {
+            role: 'assistant',
+            type: 'chart',
+            chartData: chartData,
+            content: '',
+            loading: false
+          };
+
+          messages.value.push(chartMsg);
+          console.log("✨ [节点6] 图表消息已推入 messages 数组", messages.value);
+
+          await scrollToBottom();
+        } catch (chartErr) {
+          console.error("❌ [异常] 图表接口调用或解析失败:", chartErr);
+        }
+
+        isStreaming.value = false;
         await loadSessions();
       },
       (err) => {
-        // 5. 错误处理
-        messages.value[aiMessageIndex].content = "服务连接异常，请重试。";
-        messages.value[aiMessageIndex].loading = false;
+        console.error("❌ [异常] 流式接口报错:", err);
+        messages.value[aiTextIndex].loading = false;
         isStreaming.value = false;
-        console.error("Stream Error:", err);
       }
     );
   } catch (e) {
+    console.error("❌ [异常] handleChartWorkflow 执行错误:", e);
     isStreaming.value = false;
-    console.error("Send Error:", e);
   }
+};
+
+// 普通流式链路（保持你原来的逻辑）
+const handleNormalChatWorkflow = async (text) => {
+  const aiIndex = messages.value.push({ role: 'assistant', content: "", loading: true }) - 1;
+  isStreaming.value = true;
+  await fetchChatStream(
+    currentMemoryId.value, text,
+    (token) => { messages.value[aiIndex].content += token; scrollToBottom(); },
+    async () => {
+      messages.value[aiIndex].loading = false;
+      isStreaming.value = false;
+      await loadSessions();
+    }
+  );
 };
 
 const createNewAnalysis = () => {
@@ -276,25 +346,43 @@ const createNewAnalysis = () => {
 // 1. 处理点击切换会话
 const handleSelectSession = async (memoryId) => {
   if (isStreaming.value) return;
-
   loading.value = true;
   currentMemoryId.value = memoryId;
 
   try {
     const res = await fetchChatHistory(memoryId);
 
-    // 后端 MessageDTO 已经处理好了 role 和 content，直接映射
-    // 如果后端 role 返回的是 'ai'，而前端样式需要 'assistant'，做个简单的转换
-    messages.value = res.data.map(msg => ({
-      role: msg.role === 'ai' ? 'assistant' : msg.role,
-      content: msg.content,
-      loading: false
-    }));
+    messages.value = res.data.map(msg => {
+      const isAI = msg.role === 'ai' || msg.role === 'assistant';
+      const content = msg.content || "";
+
+      // 核心逻辑：尝试判断这条历史消息是不是图表
+      let type = 'text';
+      let chartData = null;
+
+      if (isAI && content.includes('"type":"CHART_NDVI"')) {
+        try {
+          // 如果内容本身就是 JSON 字符串，尝试解析它
+          chartData = JSON.parse(content);
+          type = 'chart';
+        } catch (e) {
+          console.warn("历史记录中的JSON解析失败", e);
+        }
+      }
+
+      return {
+        role: isAI ? 'assistant' : 'user',
+        type: type,
+        content: type === 'chart' ? '' : content, // 如果是图表，清空 content 避免显示源码
+        chartData: chartData,
+        loading: false
+      };
+    });
 
     await scrollToBottom();
   } catch (error) {
     console.error("加载历史记录失败:", error);
-    messages.value = []; // 失败时清空防止显示错乱
+    messages.value = [];
   } finally {
     loading.value = false;
   }
