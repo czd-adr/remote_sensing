@@ -132,7 +132,7 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
-import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession, fetchChatChart } from "@/api/chat";
+import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession, fetchChatChart, fetchChatEnglishStream } from "@/api/chat";
 import { ElMessageBox, ElMessage } from 'element-plus';
 //自定义组件
 import NDVIChart from '@/components/NDVIChart.vue'
@@ -252,7 +252,9 @@ const handleSend = async (customMsg = null) => {
   }
 };
 
-// 复合链路逻辑修正
+// ==========================================
+// 复合链路逻辑（图表 + 文本流）
+// ==========================================
 const handleChartWorkflow = async (text) => {
   const aiTextIndex = messages.value.push({
     role: 'assistant',
@@ -268,7 +270,8 @@ const handleChartWorkflow = async (text) => {
   const chartPromise = fetchChatChart(currentMemoryId.value, text);
 
   try {
-    await fetchChatStream(
+    // 🎯 核心替换点：改用英文流式路由
+    await fetchChatEnglishStream(
       currentMemoryId.value,
       text,
       (token) => {
@@ -281,14 +284,8 @@ const handleChartWorkflow = async (text) => {
 
         try {
           const res = await chartPromise;
-          console.log("📦 [节点3] 图表接口原始响应:", res);
-
-          // 关键排查点：res.data 是不是预期的 DTO 对象？
           const rawData = res.data;
-          console.log("🔍 [节点4] data 内容类型:", typeof rawData, rawData);
-
           let chartData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-          console.log("📊 [节点5] 解析后的 chartData:", chartData);
 
           // 插入图表消息
           const chartMsg = {
@@ -300,8 +297,6 @@ const handleChartWorkflow = async (text) => {
           };
 
           messages.value.push(chartMsg);
-          console.log("✨ [节点6] 图表消息已推入 messages 数组", messages.value);
-
           await scrollToBottom();
         } catch (chartErr) {
           console.error("❌ [异常] 图表接口调用或解析失败:", chartErr);
@@ -322,12 +317,17 @@ const handleChartWorkflow = async (text) => {
   }
 };
 
-// 普通流式链路（保持你原来的逻辑）
+// ==========================================
+// 普通纯文字流式链路
+// ==========================================
 const handleNormalChatWorkflow = async (text) => {
   const aiIndex = messages.value.push({ role: 'assistant', content: "", loading: true }) - 1;
   isStreaming.value = true;
-  await fetchChatStream(
-    currentMemoryId.value, text,
+
+  // 🎯 核心替换点：改用英文流式路由
+  await fetchChatEnglishStream(
+    currentMemoryId.value,
+    text,
     (token) => { messages.value[aiIndex].content += token; scrollToBottom(); },
     async () => {
       messages.value[aiIndex].loading = false;

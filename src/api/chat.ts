@@ -12,7 +12,7 @@ export function chatBase(memoryId: string, message: string) {
   params.append('message', message);
 
   return axios({
-    url: `${baseUrl}/WebGISAgent/chat`,
+    url: `${baseUrl}/WebGISAgent/Echat`,
     method: 'post',
     data: params,
     headers: {
@@ -21,6 +21,48 @@ export function chatBase(memoryId: string, message: string) {
     // 如果非要用 axios 接收流，需要设置响应类型
     responseType: 'stream'
   });
+}
+export async function fetchChatEnglishStream(
+  memoryId: string,
+  message: string,
+  onMessage: (token: string) => void,
+  onDone?: () => void,
+  onError?: (error: any) => void
+) {
+  const params = new URLSearchParams();
+  params.append('memoryId', memoryId);
+  params.append('message', message);
+
+  try {
+    // 🎯 核心修改点：将路由修改为后端对应的 /WebGISAgent/Echat
+    const response = await fetch(`${baseUrl}/WebGISAgent/Echat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params
+    });
+
+    if (!response.ok) throw new Error('Network response was not ok');
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        // 将解析出的字符块传给回调函数
+        onMessage(chunk);
+      }
+      onDone?.();
+    }
+  } catch (error) {
+    if (onError) onError(error);
+    else console.error("English Streaming error:", error);
+  }
 }
 export function fetchChatSessions() {
   return axios({
