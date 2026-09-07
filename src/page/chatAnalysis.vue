@@ -241,7 +241,7 @@ const handleSend = async (customMsg = null) => {
   }
 
   // 1. 意图预判
-  const isChartRequest = /图表|趋势图|曲线|可视化|分析图|画图/.test(text);
+  const isChartRequest = /图表|趋势图|曲线|可视化|分析图|画图|chart/.test(text);
 
   if (isChartRequest) {
     // 逻辑 A: 复合链路

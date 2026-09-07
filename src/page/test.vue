@@ -343,7 +343,7 @@ const ndvi = new TileLayer({
   source: new TileWMS({
     url: 'http://localhost:8080/geoserver/test/wms',
     params: {
-      'LAYERS': 'test:23NDVI_mean',
+      'LAYERS': 'test:23_1_NDVI',
       'TILED': true,
       'SRS': 'EPSG:4326',
       'FORMAT': 'image/png',

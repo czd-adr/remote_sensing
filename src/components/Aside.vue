@@ -19,7 +19,7 @@
     </el-menu-item>
     <el-menu-item index="/index/ml">
       <i class="el-icon-user-solid"></i>
-      <span slot="title">机器学习结果</span>
+      <span slot="title">地物分类</span>
     </el-menu-item>
     <el-menu-item index="/index/compartion">
       <i class="el-icon-user-solid"></i>
