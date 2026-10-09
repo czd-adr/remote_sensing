@@ -13,7 +13,12 @@
 
       <!-- 历史会话列表：设置滚动 -->
       <div class="history-scroll-area">
-        <p class="section-title">Recent Sessions</p>
+        <div class="section-header">
+          <p class="section-title">Recent Sessions</p>
+          <button class="batch-toggle" @click="toggleBatchMode">
+            {{ batchMode ? "完成" : "批量管理" }}
+          </button>
+        </div>
         <div
           v-for="session in sessionList"
           :key="session.memoryId"
@@ -21,14 +26,24 @@
             'history-item',
             { active: currentMemoryId === session.memoryId },
           ]"
-          @click="handleSelectSession(session.memoryId)"
+          @click="
+            batchMode
+              ? toggleSelect(session.memoryId)
+              : handleSelectSession(session.memoryId)
+          "
         >
-          <div class="history-icon">🕒</div>
+          <div
+            v-if="batchMode"
+            class="check-box"
+            :class="{ checked: selectedIds.includes(session.memoryId) }"
+          ></div>
+          <div v-else class="history-icon">🕒</div>
           <div class="history-info">
             <p class="history-name">{{ session.title }}</p>
             <p class="history-time">{{ session.time }}</p>
           </div>
           <button
+            v-if="!batchMode"
             class="delete-btn"
             @click.stop="confirmDelete(session.memoryId)"
           >
@@ -37,6 +52,20 @@
         </div>
 
         <!-- 模拟较多数据以测试滚动 -->
+      </div>
+
+      <!-- 批量操作栏 -->
+      <div v-if="batchMode" class="batch-footer">
+        <button class="batch-btn" @click="toggleSelectAll">
+          {{ allSelected ? "取消全选" : "全选" }}
+        </button>
+        <button
+          class="batch-btn batch-delete"
+          :disabled="selectedIds.length === 0"
+          @click="batchDelete"
+        >
+          删除选中 ({{ selectedIds.length }})
+        </button>
       </div>
     </aside>
 
@@ -131,8 +160,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
-import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession, fetchChatChart, fetchChatEnglishStream } from "@/api/chat";
+import { ref, computed, onMounted, nextTick } from 'vue';
+import { fetchChatStream, fetchChatSessions, fetchChatHistory, deleteChatSession, deleteChatSessions, fetchChatChart, fetchChatEnglishStream } from "@/api/chat";
 import { ElMessageBox, ElMessage } from 'element-plus';
 //自定义组件
 import NDVIChart from '@/components/NDVIChart.vue'
@@ -153,6 +182,78 @@ const historySessions = ref([
   { id: 2, title: 'Sahara Dust Storm Track', time: 'Updated 1d ago' },
   { id: 3, title: 'Urban Expansion Tokyo', time: 'Updated 3d ago' }
 ]);
+// ==========================================
+// 批量删除会话相关状态与方法
+// ==========================================
+const batchMode = ref(false); // 是否处于批量管理模式
+const selectedIds = ref([]); // 已选中的会话 memoryId 列表
+
+const allSelected = computed(() => {
+  return sessionList.value.length > 0 && selectedIds.value.length === sessionList.value.length;
+});
+
+const toggleBatchMode = () => {
+  batchMode.value = !batchMode.value;
+  selectedIds.value = [];
+};
+
+const toggleSelect = (memoryId) => {
+  const idx = selectedIds.value.indexOf(memoryId);
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1);
+  } else {
+    selectedIds.value.push(memoryId);
+  }
+};
+
+const toggleSelectAll = () => {
+  if (allSelected.value) {
+    selectedIds.value = [];
+  } else {
+    selectedIds.value = sessionList.value.map(s => s.memoryId);
+  }
+};
+
+const batchDelete = async () => {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择要删除的会话');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `此操作将永久删除选中的 ${selectedIds.value.length} 个会话及其历史记录, 是否继续?`,
+      '批量删除',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+      }
+    );
+  } catch (cancel) {
+    console.log('用户取消了批量删除');
+    return;
+  }
+
+  try {
+    await deleteChatSessions(selectedIds.value);
+    ElMessage({ type: 'success', message: `已成功删除 ${selectedIds.value.length} 个会话` });
+
+    // 如果删掉的包含当前正在看的会话，清空界面，并让 loadSessions 自动选中剩余第一个
+    const deletedCurrent = selectedIds.value.includes(currentMemoryId.value);
+    selectedIds.value = [];
+    batchMode.value = false;
+    if (deletedCurrent) {
+      messages.value = [];
+      currentMemoryId.value = "";
+    }
+    await loadSessions();
+  } catch (error) {
+    console.error("后端批量删除接口报错:", error);
+    ElMessage.error("批量删除失败，服务器响应异常");
+  }
+};
 const confirmDelete = async (memoryId) => {
   // 1. 使用 ElMessageBox 进行二次确认
   try {
@@ -449,6 +550,87 @@ onMounted(() => {
   padding: 1rem 0.75rem 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* --- 批量管理 --- */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 0.75rem;
+}
+.batch-toggle {
+  background: transparent;
+  border: none;
+  color: #ea580c;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+.batch-toggle:hover {
+  text-decoration: underline;
+}
+.check-box {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  background: white;
+}
+.check-box.checked {
+  background: #ea580c;
+  border-color: #ea580c;
+}
+.check-box.checked::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.batch-footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fff;
+}
+.batch-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #374151;
+  transition: all 0.2s;
+}
+.batch-btn:hover {
+  background: #f3f4f6;
+}
+.batch-delete {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+.batch-delete:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+.batch-delete:disabled {
+  background: #fca5a5;
+  border-color: #fca5a5;
+  color: #fff;
+  cursor: not-allowed;
 }
 
 /* --- 历史项基础样式 --- */

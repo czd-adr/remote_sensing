@@ -135,6 +135,20 @@ export function deleteChatSession(memoryId: string) {
     method: 'delete'
   });
 }
+/**
+ * 批量删除会话
+ * 后端接口：@DeleteMapping("/sessions")，接收 @RequestBody List<String> memoryIds
+ */
+export function deleteChatSessions(memoryIds: string[]) {
+  return axios({
+    url: `${baseUrl}/WebGISAgent/sessions`,
+    method: 'delete',
+    data: memoryIds,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
 
 export function fetchChatChart(memoryId: string, message: string) {
   return axios({
