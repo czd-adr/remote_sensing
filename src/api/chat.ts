@@ -64,6 +64,7 @@ export async function fetchChatEnglishStream(
     else console.error("English Streaming error:", error);
   }
 }
+
 export function fetchChatSessions() {
   return axios({
     url: `${baseUrl}/WebGISAgent/sessions`, // ⚠️ 注意：这里确保路径与你后端 Controller 的 RequestMapping 一致

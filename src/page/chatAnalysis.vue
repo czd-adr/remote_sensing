@@ -325,7 +325,7 @@ const handleNormalChatWorkflow = async (text) => {
   isStreaming.value = true;
 
   // 🎯 核心替换点：改用英文流式路由
-  await fetchChatEnglishStream(
+  await fetchChatStream(
     currentMemoryId.value,
     text,
     (token) => { messages.value[aiIndex].content += token; scrollToBottom(); },
