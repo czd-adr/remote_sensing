@@ -28,6 +28,7 @@
                   drag
                   action="#"
                   :auto-upload="false"
+                  :on-change="handleUpload"
                 >
                   <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                   <div class="el-upload__text">
@@ -35,7 +36,7 @@
                   </div>
                   <template #tip>
                     <div class="el-upload__tip">
-                      支持 .png / .jpg / .tif 格式影像，单文件不超过 50MB
+                      请上传影像文件(zip格式)，单文件不超过 50MB
                     </div>
                   </template>
                 </el-upload>
@@ -52,8 +53,16 @@
                   <span class="card-title">地物分类结果图像展示区</span>
                 </div>
               </template>
-              <div class="card-body center-content">
-                <div class="image-preview-placeholder">
+              <div class="card-body result-body">
+                <div id="resultMap" class="map-container"></div>
+                <div v-if="predicting" class="loading-mask">
+                  <el-icon class="loading-icon" :size="40"><Loading /></el-icon>
+                  <span>正在预测...</span>
+                </div>
+                <div
+                  v-else-if="!resultVisible"
+                  class="image-preview-placeholder map-mask"
+                >
                   <p class="placeholder-text">分类结果图像展示位置</p>
                 </div>
               </div>
@@ -73,9 +82,13 @@
               <!-- 上半部分：饼状图区域 -->
               <div class="chart-section">
                 <h4 class="section-subtitle">饼状图</h4>
-                <div class="chart-container" id="pieChart">
-                  <!-- ECharts 图表绘制挂载区域 -->
-                  <p class="placeholder-text">[ ECharts 饼图渲染区域 ]</p>
+                <div
+                  v-if="predicted"
+                  class="chart-container"
+                  id="pieChart"
+                ></div>
+                <div v-else class="chart-container">
+                  <p class="placeholder-text">上传文件后可查看饼状图</p>
                 </div>
               </div>
 
@@ -83,22 +96,26 @@
               <div class="table-section">
                 <h4 class="section-subtitle">结果表格信息</h4>
                 <el-table
+                  v-if="predicted"
                   :data="resultTableData"
                   border
                   stripe
                   style="width: 100%"
                 >
                   <el-table-column prop="type" label="类型" align="center" />
-                  <el-table-column prop="road" label="道路" align="center" />
-                  <el-table-column prop="forest" label="林地" align="center" />
-                  <el-table-column prop="water" label="水体" align="center" />
-                  <el-table-column prop="grass" label="草地" align="center" />
                   <el-table-column
-                    prop="background"
-                    label="背景"
+                    prop="hhmc"
+                    label="互花米草"
                     align="center"
                   />
+                  <el-table-column prop="lw" label="芦苇" align="center" />
+                  <el-table-column prop="jp" label="碱蓬" align="center" />
+                  <el-table-column prop="water" label="水体" align="center" />
+                  <el-table-column prop="other" label="其他" align="center" />
                 </el-table>
+                <div v-else class="chart-container table-placeholder">
+                  <p class="placeholder-text">上传文件后可查看结果</p>
+                </div>
               </div>
             </div>
           </el-card>
@@ -109,20 +126,132 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { UploadFilled, Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
+// OpenLayers
+import Map from 'ol/Map'
+import View from 'ol/View'
+import TileLayer from 'ol/layer/Tile'
+import XYZ from 'ol/source/XYZ'
+import TileWMS from 'ol/source/TileWMS'
 
-// 模拟右侧结果表格数据
-const resultTableData = ref([
-  {
-    type: '占比结果',
-    road: '6.00%',
-    forest: '36.29%',
-    water: '45.33%',
-    grass: '0.00%',
-    background: '12.38%'
-  }
-])
+// 地物分类面积数据（参考 ml.vue stkData）
+const stkData = [
+  { value: 27309129.808, name: '互花米草', key: 'hhmc' },
+  { value: 24244824.165, name: '芦苇', key: 'lw' },
+  { value: 35968123.212, name: '碱蓬', key: 'jp' },
+  { value: 41496192.490, name: '水体', key: 'water' },
+  { value: 55996690.152, name: '其他', key: 'other' }
+]
+const totalArea = stkData.reduce((sum, d) => sum + d.value, 0)
+
+// 结果表格数据：各分类面积占比
+const resultTableData = computed(() => {
+  const row = { type: '占比结果' }
+  stkData.forEach(d => {
+    row[d.key] = ((d.value / totalArea) * 100).toFixed(2) + '%'
+  })
+  return [row]
+})
+
+// ============ 地物分类结果地图 ============
+const resultVisible = ref(false) // 是否已展示结果地图
+const predicting = ref(false) // 是否正在预测（控制加载动画）
+const predicted = ref(false) // 是否已完成预测（控制饼图/表格显示）
+let resultMap = null
+
+// 卫星底图
+const satelliteSource = new XYZ({
+  url: 'http://wprd0{1-4}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+})
+const satelliteLayer = new TileLayer({ source: satelliteSource })
+
+// Stacking_JM 分类结果图层（参考 ml.vue）
+const Stacking_JM = new TileLayer({
+  source: new TileWMS({
+    url: 'http://localhost:8080/geoserver/test/wms',
+    params: {
+      'LAYERS': 'test:Stacking',
+      'TILED': true,
+      'FORMAT': 'image/png',
+      'TRANSPARENT': true
+    },
+    serverType: 'geoserver'
+  }),
+  zIndex: 20
+})
+
+const resultView = new View({
+  center: [119.281, 34.77934],
+  zoom: 12.4,
+  projection: 'EPSG:4326'
+})
+
+onMounted(async () => {
+  await nextTick()
+  resultMap = new Map({
+    target: 'resultMap',
+    view: resultView,
+    layers: [satelliteLayer]
+  })
+})
+
+// 饼图渲染（参考 ml.vue loadPie）
+let pieChart = null
+const renderPie = () => {
+  const dom = document.getElementById('pieChart')
+  if (!dom) return
+  if (pieChart) pieChart.dispose()
+  pieChart = echarts.init(dom)
+  pieChart.setOption({
+    title: { text: '地物分类面积分布', subtext: '单位：m²', left: 'center' },
+    tooltip: { trigger: 'item' },
+    legend: { orient: 'vertical', left: 'left' },
+    series: [
+      {
+        name: '地物类型',
+        type: 'pie',
+        radius: '50%',
+        data: stkData,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
+      }
+    ]
+  })
+}
+
+// 上传文件：0.5s 上传提示 -> 1.5s 预测提示（加载动画）-> 展示结果
+const handleUpload = () => {
+  const uploadMsg = ElMessage({ message: '正在上传...', type: 'info', duration: 0 })
+  setTimeout(() => {
+    uploadMsg.close()
+    // 进入预测阶段：显示加载动画，暂不渲染结果地图
+    predicting.value = true
+    const predictMsg = ElMessage({ message: '正在预测...', type: 'info', duration: 0 })
+    setTimeout(() => {
+      predictMsg.close()
+      predicting.value = false
+      // 预测结束：渲染结果地图、饼图、表格
+      resultVisible.value = true
+      if (resultMap) {
+        if (!resultMap.getLayers().getArray().includes(Stacking_JM)) {
+          resultMap.addLayer(Stacking_JM)
+        }
+        resultMap.updateSize()
+      }
+      predicted.value = true
+      nextTick(() => renderPie())
+      ElMessage({ message: '预测完成', type: 'success' })
+    }, 1500)
+  }, 500)
+}
 </script>
 
 <style scoped>
@@ -172,9 +301,14 @@ const resultTableData = ref([
   gap: 16px; /* 上下卡片之间的色彩分割间距 */
 }
 
-.input-card,
+.input-card {
+  flex: 4.5;
+  display: flex;
+  flex-direction: column;
+}
+
 .result-img-card {
-  flex: 1;
+  flex: 5.5;
   display: flex;
   flex-direction: column;
 }
@@ -217,6 +351,53 @@ const resultTableData = ref([
   margin-top: 16px;
 }
 
+/* 结果地图容器 */
+.result-body {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+.map-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.loading-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #409eff;
+  font-size: 14px;
+}
+.loading-mask .loading-icon {
+  animation: loading-rotate 1s linear infinite;
+}
+@keyframes loading-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* 图像占位样式 */
 .image-preview-placeholder,
 .chart-container {
@@ -254,6 +435,10 @@ const resultTableData = ref([
 
 .table-section {
   flex-shrink: 0;
+}
+
+.table-placeholder {
+  min-height: 120px;
 }
 
 .section-subtitle {
