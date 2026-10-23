@@ -1087,7 +1087,7 @@ function initMap () {
     target: 'map',//地图实例挂载id=map的容器
     view: view,
     layers: [
-      gaodeLayer, satelliteLayer]
+      satelliteLayer]
   })
   map.on('click', (event) => {
     const [lon, lat] = event.coordinate; // EPSG:4326 下已经是经纬度
