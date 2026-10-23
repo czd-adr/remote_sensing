@@ -14,12 +14,16 @@ import ts from '../page/ts.vue'
 import login from '../page/login.vue'
 import compartion from '../page/compartion.vue'
 import chatAnalysis from '../page/chatAnalysis.vue'
+import workRegion from '../page/workRegion.vue'
 const routes = [
     { 
       path: '/sample', component: sample 
     },
     { 
       path: '/threeTest', component: threeTest 
+    },
+    { 
+      path: '/workRegion', component: workRegion 
     },
     { 
       path: '/ts', component: ts 
@@ -58,6 +62,11 @@ const routes = [
           path: 'ml', 
           name: 'ml',
           component: ml
+        },
+          {
+          path: 'workRegion', 
+          name: 'workRegion',
+          component: workRegion
         },
         {
           path: 'chatAnalysis', 

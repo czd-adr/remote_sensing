@@ -21,6 +21,10 @@
       <i class="el-icon-user-solid"></i>
       <span slot="title">地物分类</span>
     </el-menu-item>
+    <el-menu-item index="/index/workRegion">
+      <i class="el-icon-user-solid"></i>
+      <span slot="title">工作区域</span>
+    </el-menu-item>
     <el-menu-item index="/index/compartion">
       <i class="el-icon-user-solid"></i>
       <span slot="title">差异对比</span>
