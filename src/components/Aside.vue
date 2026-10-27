@@ -35,6 +35,10 @@
       <i class="el-icon-s-goods"></i>
       <span slot="title">植被监测信息</span>
     </el-menu-item>
+    <el-menu-item index="fileManager">
+      <i class="el-icon-s-goods"></i>
+      <span slot="title">文件管理</span>
+    </el-menu-item>
   </el-menu>
 </template>
 

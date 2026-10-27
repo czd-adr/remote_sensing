@@ -50,6 +50,7 @@
               type="month"
               size="small"
               value-format="YYYY-MM"
+              :disabled-date="disableNon2023"
             />
           </div>
           <div class="filter-item">
@@ -59,6 +60,7 @@
               type="month"
               size="small"
               value-format="YYYY-MM"
+              :disabled-date="disableNon2023"
             />
           </div>
           <div class="button-group">
@@ -97,6 +99,10 @@ const isCollapsed = ref(false) // 控制面板是否折叠
 const config = reactive({
 
 })
+// 限制时相选择器只能在 2023 年各月份中选择
+const disableNon2023 = (date) => {
+  return date.getFullYear() !== 2023;
+}
 const mousePosition = ref('')
 const isActiveNDVI = ref(false)
 const analysisData = ref(null)
