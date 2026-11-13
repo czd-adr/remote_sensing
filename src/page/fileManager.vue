@@ -5,9 +5,9 @@
       <template #header>
         <div class="list-header">
           <span class="card-title">上传文件</span>
-          <el-button type="primary" @click="openUploadDialog"
-            >上传文件</el-button
-          >
+          <el-button type="primary" @click="openUploadDialog">
+            上传文件
+          </el-button>
         </div>
       </template>
       <div class="upload-tip">
@@ -112,7 +112,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-but
+        <el-button @click="dialogVisible = false">取消</el-button>
         <el-button
           type="primary"
           :loading="uploading"

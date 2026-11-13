@@ -16,6 +16,7 @@ import compartion from '../page/compartion.vue'
 import chatAnalysis from '../page/chatAnalysis.vue'
 import workRegion from '../page/workRegion.vue'
 import fileManager from '../page/fileManager.vue'
+import agent from '../page/agent.vue'
 const routes = [
     { 
       path: '/sample', component: sample 
@@ -88,6 +89,11 @@ const routes = [
           path: 'fileManager', 
           name: 'fileManager',
           component: fileManager
+        },
+        {
+          path: 'agent', 
+          name: 'agent',
+          component: agent
         },
       ]
     },

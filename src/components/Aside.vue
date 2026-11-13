@@ -17,6 +17,10 @@
       <i class="el-icon-user-solid"></i>
       <span slot="title">RS-Agent</span>
     </el-menu-item>
+    <el-menu-item index="/index/agent">
+      <i class="el-icon-s-goods"></i>
+      <span slot="title">智能体</span>
+    </el-menu-item>
 
     <el-menu-item index="/index/workRegion">
       <i class="el-icon-user-solid"></i>
