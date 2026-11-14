@@ -27,16 +27,19 @@ export interface AgentToolContext {
 export function createAgentTools(ctx: AgentToolContext) {
   const { map, view, layerRegistry, isInspectorActive, startDrawInteraction } = ctx
 
-  // 根据 layerName 在注册表中查找图层实例（全名/短名/大小写不敏感匹配）
+  // 根据 layerName 在注册表中查找图层实例（全名/短名/大小写不敏感/分号冒号兼容匹配）
   const findLayer = (layerName: string): { key: string; layer: TileLayer<any> } | null => {
     if (!layerName) return null
-    const target = String(layerName).toLowerCase()
+    // 归一化：分号转冒号、去空格、转小写
+    const normalize = (s: string) => String(s).replace(/;/g, ':').replace(/\s+/g, '').toLowerCase()
+    const target = normalize(layerName)
     const keys = Object.keys(layerRegistry)
-    const exact = keys.find((k) => k.toLowerCase() === target)
+    const exact = keys.find((k) => normalize(k) === target)
     if (exact) return { key: exact, layer: layerRegistry[exact] }
     const short = keys.find((k) => {
-      const shortName = (k.split(':').pop() || '').toLowerCase()
-      return k.toLowerCase() === target || target === shortName || k.toLowerCase().endsWith(target) || target.endsWith(shortName)
+      const nk = normalize(k)
+      const shortName = nk.split(':').pop() || ''
+      return nk === target || target === shortName || nk.endsWith(target) || target.endsWith(shortName)
     })
     return short ? { key: short, layer: layerRegistry[short] } : null
   }

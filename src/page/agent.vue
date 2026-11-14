@@ -347,21 +347,20 @@ const parseToolCall = (text) => {
   // 优先：提取 ```json 代码块
   const jsonBlock = text.match(/```json\s*([\s\S]*?)```/)
   if (jsonBlock) {
-    try {
-      const data = JSON.parse(jsonBlock[1].trim())
-      const toolName = data.tool || data.toolName || data.tool_code
-      if (toolName) {
-        return { toolName, args: data.arguments || data.args || data }
-      }
-      if (data.layerName !== undefined || data.visible !== undefined) {
-        return { toolName: 'toggle_layer', args: data }
-      }
-    } catch (e) {
-      console.warn('工具 JSON 解析失败:', e)
+    const parsed = tryParseToolJson(jsonBlock[1].trim())
+    if (parsed) return parsed
+  }
+
+  // 新增：提取裸 JSON 对象（无代码块包裹，如 {"layerName":"test;dem","visible":true}）
+  const bareMatches = text.match(/\{[^{}]*\}/g)
+  if (bareMatches) {
+    for (const m of bareMatches) {
+      const parsed = tryParseToolJson(m)
+      if (parsed) return parsed
     }
   }
 
-  // 兼容旧格式
+  // 兼容旧格式：【执行工具】tool_code 【参数】{...}
   const toolMatch = text.match(/【执行工具】\s*([A-Za-z_][\w]*)/)
   if (toolMatch) {
     let args = {}
@@ -372,6 +371,24 @@ const parseToolCall = (text) => {
     return { toolName: toolMatch[1], args }
   }
   return null
+}
+
+// 尝试把一段 JSON 字符串解析为工具调用
+const tryParseToolJson = (jsonStr) => {
+  try {
+    const data = JSON.parse(jsonStr)
+    if (!data || typeof data !== 'object') return null
+    const toolName = data.tool || data.toolName || data.tool_code
+    if (toolName) {
+      return { toolName, args: data.arguments || data.args || data }
+    }
+    if (data.layerName !== undefined || data.visible !== undefined) {
+      return { toolName: 'toggle_layer', args: data }
+    }
+    return null
+  } catch (e) {
+    return null
+  }
 }
 
 // 执行流式文本中携带的工具调用，返回执行结果

@@ -90,7 +90,7 @@ export async function fetchChatStream(
   params.append('message', message);
 
   try {
-    const response = await fetch(`${baseUrl}/WebGISAgent/chat`, {
+    const response = await fetch(`${baseUrl}/WebGISAgent/orchestrate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
