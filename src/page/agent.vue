@@ -185,6 +185,25 @@
                       >
                         <NDVIChart :chartData="msg.chartData" />
                       </div>
+
+                      <!-- 分析报告生成按钮 -->
+                      <div
+                        v-if="msg.canGenerateReport && !msg.loading"
+                        class="report-actions"
+                      >
+                        <el-button
+                          size="small"
+                          type="primary"
+                          :loading="msg.generatingReport"
+                          @click="handleGenerateReport(index)"
+                        >
+                          {{
+                            msg.generatingReport
+                              ? "报告生成中..."
+                              : "生成分析报告"
+                          }}
+                        </el-button>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -248,6 +267,38 @@
         <span>RS-AGENT 协同中枢</span>
       </div>
     </div>
+
+    <!-- 分析报告预览弹窗 -->
+    <el-dialog
+      v-model="reportDialogVisible"
+      :title="currentReport ? currentReport.title : '分析报告'"
+      width="860px"
+      top="5vh"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <div class="report-toolbar">
+        <el-button
+          size="small"
+          type="primary"
+          @click="handleDownloadReport('doc')"
+        >
+          下载 Word
+        </el-button>
+        <el-button size="small" @click="handleDownloadReport('md')">
+          下载 Markdown
+        </el-button>
+      </div>
+      <iframe
+        v-if="currentReport"
+        :src="`http://localhost:8099/report/${currentReport.id}/html`"
+        class="report-iframe"
+        frameborder="0"
+      ></iframe>
+      <template #footer>
+        <el-button @click="reportDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -264,6 +315,8 @@ import NDVIChart from '@/components/NDVIChart.vue'
 import { createAgentTools } from '@/utils/tools'
 import { buildLayerRegistry, createGaodeLayer } from '@/utils/mapManager'
 import { fetchActiveLayers, addActiveLayer, removeActiveLayer } from '@/utils/activeLayer'
+import { generateReport, downloadReport } from '@/api/report'
+import { ElMessage } from 'element-plus'
 
 // 1. 面板宽度控制（默认右侧占比 35%）
 const panelSize = ref('65%')
@@ -277,6 +330,11 @@ const chatContainer = ref(null)
 const currentMemoryId = ref("")
 const activeLayers = ref([])
 
+// 分析报告相关状态
+const reportDialogVisible = ref(false)
+const currentReport = ref(null) // { id, title }
+const reportLoading = ref(false)
+
 // 3. 地图实例、图层注册表与工具集
 let map = null
 let agentTools = null
@@ -285,7 +343,7 @@ const isInspectorActive = ref(false)
 // GeoServer 图层注册表（toggle_layer 可操作的全部备用图层）
 const layerRegistry = buildLayerRegistry()
 // 高德卫星底图
-const satelliteBaseLayer = createGaodeLayer(6)
+const satelliteBaseLayer = createGaodeLayer(7)
 // 连云港样例底图（test:628yangshi）
 const ditu = layerRegistry['test:628yangshi']
 
@@ -459,6 +517,57 @@ const createNewAnalysis = () => {
   loadActiveLayers()
 }
 
+// 判断是否为分析类问题（用于决定是否展示【生成分析报告】按钮）
+const isAnalysisQuestion = (text) => {
+  return /对比|趋势|长势|差异|变化|分析/.test(text || '')
+}
+
+// 生成分析报告
+const handleGenerateReport = async (index) => {
+  const msg = messages.value[index]
+  if (!msg || !msg.question || reportLoading.value) return
+
+  reportLoading.value = true
+  msg.generatingReport = true
+  try {
+    const res = await generateReport(currentMemoryId.value, msg.question)
+    const result = res.data
+    if (result && result.code === 200) {
+      const report = result.data
+      currentReport.value = { id: report.reportId, title: report.title || '分析报告' }
+      reportDialogVisible.value = true
+    } else {
+      ElMessage.error((result && result.msg) || '生成报告失败')
+    }
+  } catch (e) {
+    console.error('生成报告失败:', e)
+    ElMessage.error('生成报告失败')
+  } finally {
+    reportLoading.value = false
+    msg.generatingReport = false
+  }
+}
+
+// 下载报告（format: doc | md）
+const handleDownloadReport = async (format) => {
+  if (!currentReport.value) return
+  try {
+    const res = await downloadReport(currentReport.value.id, format)
+    const blob = new Blob([res.data])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${currentReport.value.title}.${format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('下载报告失败:', e)
+    ElMessage.error('下载报告失败')
+  }
+}
+
 // 发送消息核心逻辑
 const handleSend = async (customMsg = null) => {
   const text = customMsg || inputMsg.value
@@ -484,7 +593,9 @@ const handleChartWorkflow = async (text) => {
     role: 'assistant',
     type: 'text',
     content: "",
-    loading: true
+    loading: true,
+    question: text,
+    canGenerateReport: isAnalysisQuestion(text)
   }) - 1
 
   isStreaming.value = true
@@ -542,7 +653,13 @@ const handleChartWorkflow = async (text) => {
 
 // 普通纯文字流式链路
 const handleNormalChatWorkflow = async (text) => {
-  const aiIndex = messages.value.push({ role: 'assistant', content: "", loading: true }) - 1
+  const aiIndex = messages.value.push({
+    role: 'assistant',
+    content: "",
+    loading: true,
+    question: text,
+    canGenerateReport: isAnalysisQuestion(text)
+  }) - 1
   isStreaming.value = true
   await scrollToBottom()
 
@@ -1076,6 +1193,25 @@ const sendQuickPrompt = (txt) => {
 
 .chart-message-wrapper {
   margin-left: 38px;
+}
+
+.report-actions {
+  margin-top: 6px;
+  margin-left: 38px;
+}
+
+.report-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.report-iframe {
+  width: 100%;
+  height: 60vh;
+  border: 1px solid #2d3449;
+  border-radius: 6px;
+  background: #ffffff;
 }
 
 .prompt-chips {
