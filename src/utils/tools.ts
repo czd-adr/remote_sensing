@@ -88,7 +88,25 @@ export function createAgentTools(ctx: AgentToolContext) {
       return { success: false, message: 'ROI 绘制工具未注册触发函数，无法开启' }
     },
 
-    // ④ 地图视角聚焦
+    // ④ 地图视角聚焦（后端注册表编码：fly_to_extent，参数 extent: [minLon,minLat,maxLon,maxLat]）
+    fly_to_extent: ({ extent }) => {
+      if (!view) return { success: false, message: '地图视图实例不可用' }
+      if (!Array.isArray(extent) || extent.length < 4) {
+        return { success: false, message: '聚焦范围参数不合法，需提供 extent: [minLon, minLat, maxLon, maxLat]' }
+      }
+      const bounds = extent.slice(0, 4).map(Number)
+      if (bounds.some((v) => isNaN(v))) {
+        return { success: false, message: '聚焦范围参数不合法，需提供合法的经纬度数值' }
+      }
+      view.fit(bounds, { duration: 500, padding: [20, 20, 20, 20] })
+      return {
+        success: true,
+        message: '已聚焦并平移地图至指定区域',
+        data: { bounds }
+      }
+    },
+
+    // ④b 地图视角聚焦（旧编码 focus_bounds，兼容保留）
     focus_bounds: ({ minLon, minLat, maxLon, maxLat }) => {
       if (!view) return { success: false, message: '地图视图实例不可用' }
       const bounds = [Number(minLon), Number(minLat), Number(maxLon), Number(maxLat)]

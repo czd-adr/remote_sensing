@@ -167,13 +167,7 @@
                         <p
                           class="text-sm text-gray-200 mt-2 leading-relaxed stream-text"
                         >
-                          {{
-                            msg.content &&
-                            typeof msg.content === "string" &&
-                            msg.content.startsWith("{")
-                              ? "NDVI图表分析中..."
-                              : msg.content
-                          }}
+                          {{ msg.content }}
                           <span v-if="msg.loading" class="cursor-blink"></span>
                         </p>
                       </div>
@@ -452,8 +446,10 @@ const tryParseToolJson = (jsonStr) => {
 // 执行流式文本中携带的工具调用，返回执行结果
 const executeToolFromText = async (text) => {
   const call = parseToolCall(text)
+  console.log('[工具解析] parseToolCall 结果:', call)
   if (!call || !agentTools) return null
   const result = agentTools.executeClientTool(call.toolName, call.args)
+  console.log('[工具执行] executeClientTool 结果:', result)
   // 仅在图层真正切换成功且为"显示"时，才同步后端 add 并刷新列表
   if (result && result.success && call.toolName === 'toggle_layer' && result.data && result.data.visible) {
     await syncAddActiveLayer(result.data.layerName)
@@ -674,6 +670,7 @@ const handleNormalChatWorkflow = async (text) => {
       async () => {
         messages.value[aiIndex].loading = false
         isStreaming.value = false
+        console.log('[完整回复]', messages.value[aiIndex].content)
         const result = await executeToolFromText(messages.value[aiIndex].content)
         if (result) {
           messages.value.push({
