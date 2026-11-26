@@ -100,7 +100,7 @@
                     <span class="name">RS-AGENT 协同中枢</span>
                     <span class="status">在线</span>
                   </div>
-                  <div class="sub">GeoChat-v3.5 RemoteSensing · 思维链就绪</div>
+                  <div class="sub">Qwen-plus RemoteSensing · 思维链就绪</div>
                 </div>
               </div>
               <div class="header-btns">
@@ -161,8 +161,8 @@
                       <!-- 纯文本 / 流式文本 -->
                       <div v-if="msg.type !== 'chart'" class="bubble-agent">
                         <div class="cot-tag" v-if="msg.loading || msg.content">
-                          <el-icon><Opportunity /></el-icon> 多源遥感反演与
-                          Stacking_JM 模型协同推理中
+                          <el-icon><Opportunity /></el-icon>
+                          多源遥感反演与模型协同推理中
                         </div>
                         <p
                           class="text-sm text-gray-200 mt-2 leading-relaxed stream-text"

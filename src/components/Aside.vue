@@ -13,13 +13,13 @@
       <i class="el-icon-user-solid"></i>
       <span slot="title">首页</span>
     </el-menu-item>
-    <el-menu-item index="/index/chatAnalysis">
+    <!-- <el-menu-item index="/index/chatAnalysis">
       <i class="el-icon-user-solid"></i>
       <span slot="title">RS-Agent</span>
-    </el-menu-item>
+    </el-menu-item> -->
     <el-menu-item index="/index/agent">
       <i class="el-icon-s-goods"></i>
-      <span slot="title">智能体</span>
+      <span slot="title">遥感智能体</span>
     </el-menu-item>
 
     <el-menu-item index="/index/workRegion">
@@ -35,10 +35,10 @@
       <span slot="title">样本信息</span>
     </el-menu-item>
 
-    <el-menu-item index="pt">
+    <!-- <el-menu-item index="pt">
       <i class="el-icon-s-goods"></i>
       <span slot="title">植被监测信息</span>
-    </el-menu-item>
+    </el-menu-item> -->
     <el-menu-item index="fileManager">
       <i class="el-icon-s-goods"></i>
       <span slot="title">文件管理</span>
